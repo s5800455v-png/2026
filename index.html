@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>修真塔防 · 双脉守护</title>
+    <style>
+        :root { --bg: #0a0a1a; --gold: #ffd700; --panel: rgba(74,74,138,0.5); --btn: linear-gradient(135deg,#667eea,#764ba2); }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif; }
+        body { background:var(--bg); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:20px; color:#fff; touch-action:manipulation; }
+        .game-title { font-size:2rem; font-weight:bold; margin-bottom:20px; text-shadow:0 0 10px var(--gold); color:var(--gold); }
+        .game-container { display:flex; gap:20px; background:rgba(0,0,0,0.7); padding:20px; border-radius:15px; box-shadow:0 0 30px rgba(255,215,0,0.3); border:2px solid var(--gold); position:relative; z-index:1; }
+        #gameCanvas { background:#1a1a2e; border:2px solid #4a4a8a; border-radius:10px; cursor:crosshair; width:800px; height:600px; z-index:2; touch-action:none; user-select:none; }
+        #gameNotice { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:25; display:none; background:rgba(0,0,0,0.85); color:#ffd700; padding:8px 20px; border-radius:8px; font-size:1rem; font-weight:bold; pointer-events:none; }
+        .control-panel { width:280px; display:flex; flex-direction:column; gap:6px; max-height:600px; overflow-y:auto; position:relative; z-index:5; }
+        .btn { background:var(--btn); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:bold; transition:0.15s; }
+        .btn:hover { filter:brightness(1.2); }
+        .btn:disabled { opacity:0.5; cursor:not-allowed; filter:none; }
+        .btn.danger { background:linear-gradient(135deg,#e74c3c,#c0392b); }
+        .btn.selected { border-color:#fff!important; box-shadow:0 0 12px #fff; }
+        .tower-btn { height:44px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; border:2px solid transparent; border-radius:6px; }
+        .tower-btn.selected { border-color:#fff!important; box-shadow:0 0 12px #fff; }
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:none; align-items:center; justify-content:center; z-index:100; }
+        .modal-content { background:linear-gradient(135deg,#1a1a2e,#2c3e50); padding:25px; border-radius:14px; border:2px solid var(--gold); max-width:500px; width:90%; color:#fff; text-align:center; max-height:85vh; overflow-y:auto; }
+        .modal-content h2 { color:var(--gold); margin-bottom:15px; }
+        .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0; }
+        .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0; }
+        .shop-item { background:rgba(255,255,255,0.06); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); cursor:pointer; transition:0.2s; }
+        .shop-item:hover { border-color:var(--gold); background:rgba(255,215,0,0.08); }
+        .status-row { display:flex; justify-content:space-between; padding:6px 10px; background:var(--panel); border-radius:6px; font-size:0.85rem; }
+    </style>
+</head>
+<body>
+<h1 class="game-title">🏯 修真塔防 · 双脉守护</h1>
+
+<div class="game-container" id="gameContainer" style="display:none;">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="gameNotice"></div>
+    <div class="control-panel" id="controlPanel">
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button class="btn" id="pauseBtn">⏯️暂停</button>
+            <button class="btn speed-btn" data-speed="1">1x</button>
+            <button class="btn speed-btn" data-speed="2">2x</button>
+            <button class="btn danger" id="quitBtn">🚪退出</button>
+        </div>
+        <div class="status-row" id="soloStatusRow">
+            <span>🛡️ <span id="shieldVal">15</span>/<span id="maxShieldVal">15</span></span><span>💎 <span id="lingshiVal">300</span></span>
+            <span>🌊 <span id="waveVal">0</span>/<span id="totalWavesVal">15</span></span><span>⚡ <span id="speedLabel">1x</span></span>
+        </div>
+        <div id="waveTimerRow" style="display:none;background:var(--panel);padding:6px 10px;border-radius:6px;text-align:center;">⏳ 下一波: <span id="waveTimerVal">30</span>秒</div>
+        <div id="towerInfoPanel" style="background:var(--panel);padding:8px;border-radius:6px;display:none;font-size:0.8rem;"><div id="towerInfoContent"></div></div>
+        <div id="towerBtnContainer" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;"></div>
+    </div>
+</div>
+
+<div class="modal" id="mainMenu" style="display:flex;"><div class="modal-content" style="max-width:550px;"><h2>🏯 修真塔防 · 双脉守护</h2><p style="color:#aaa;margin-bottom:12px;">五行主题策略塔防</p><div class="grid-2"><button class="btn menu-btn" id="campaignBtn">⚔️ 闯关模式</button><button class="btn menu-btn" id="settingsMenuBtn">⚙️ 设置</button></div><button class="btn menu-btn" id="continueBtn" disabled style="width:100%;margin-top:8px;">💾 继续游戏</button><p style="font-size:0.65rem;color:#666;margin-top:8px;">空格暂停 | 点击地图建塔 | 点击倒计时提前开波</p></div></div>
+
+<div class="modal" id="chapterModal"><div class="modal-content" style="max-width:600px;"><h2>📖 选择章节</h2><div class="grid-2" id="chapterGrid"></div><button class="btn modal-close" style="width:100%;margin-top:8px;background:#666;">返回</button></div></div>
+<div class="modal" id="levelModal"><div class="modal-content" style="max-width:600px;"><h2 id="levelChapterTitle">🗺️ 选择关卡</h2><div class="grid-3" id="levelGrid"></div><button class="btn" id="backToChapters" style="width:100%;margin-top:8px;background:#666;">返回章节</button></div></div>
+<div class="modal" id="difficultyModal"><div class="modal-content"><h2>⚔️ 选择难度</h2><div id="difficultyGrid"></div><button class="btn modal-close" style="width:100%;margin-top:8px;background:#666;">返回</button></div></div>
+<div class="modal" id="settingsModal"><div class="modal-content"><h2>⚙️ 设置</h2><div id="settingsContent"></div><button class="btn modal-close" style="background:#666;margin-top:8px;">关闭</button></div></div>
+<div class="modal" id="victoryModal"><div class="modal-content"><h2>🎉 恭喜通关！</h2><p id="victoryStats"></p><button class="btn" id="victoryNextBtn">下一章</button><button class="btn" id="victoryRestartBtn">返回主菜单</button></div></div>
+<div class="modal" id="failureModal"><div class="modal-content"><h2>💀 宗门失守</h2><p id="failureStats"></p><button class="btn" id="failureRetryBtn">重试</button><button class="btn" id="failureRestartBtn">返回主菜单</button></div></div>
+
+<script>
+// ==================== 公共状态 ====================
+const CELL=40,E_R=12;let modalOpenCount=0;
+function openModal(e){const t=document.getElementById(e);t&&(t.style.display="flex",0===modalOpenCount&&!paused&&(paused=!0,t._wasPaused=!1),t._wasPaused=!0,modalOpenCount++)}
+function closeModal(e){const t=document.getElementById(e);t&&(t.style.display="none",modalOpenCount=Math.max(0,modalOpenCount-1),0===modalOpenCount&&!t._wasPaused&&(paused=!1))}
+
+// ==================== 怪物系统 ====================
+const WUXING=["jin","mu","shui","huo","tu"],KE={jin:"mu",mu:"tu",tu:"shui",shui:"huo",huo:"jin"},KEP=1.5,KEM=0.7;
+const SHENG={jin:"shui",shui:"mu",mu:"huo",huo:"tu",tu:"jin"},SHENG_R=83,MAX_SHENG_LAYERS=3,SHENG_PER=0.2,NO_SHENG=new Set();
+const MONSTERS={normal:{n:"普通怪",hp:100,atk:5,aspd:1,spd:60,cost:12,sd:1,reward:8,color:"#95a5a6",icon:"👾"},swift:{n:"疾行种",hp:150,atk:8,aspd:1.2,spd:90,cost:35,sd:1,reward:15,color:"#00ffff",icon:"💨"},tank:{n:"巨化种",hp:400,atk:15,aspd:0.8,spd:45,cost:50,sd:2,reward:25,color:"#8b4513",icon:"🛡️"},elite:{n:"强化种",hp:350,atk:22,aspd:1.1,spd:70,cost:100,sd:3,reward:50,color:"#ff6347",icon:"⚔️"},boss:{n:"Boss",hp:800,atk:30,aspd:0.6,spd:40,cost:200,sd:5,reward:150,color:"#e74c3c",icon:"👑"}};
+const MUTATION={normal:{p:.1,hp:2,atk:1.5},swift:{p:.08,hp:1.8,spd:1.15},tank:{p:.05,hp:1.5,atk:1.3},elite:{p:.03,hp:1.3,aspd:1.2},boss:{p:.01,hp:1.5,atk:1.2}};
+let enemies=[],enemyIdCounter=0;
+
+function spawnMonster(ty,pathIdx,owner){
+    if(!MONSTERS[ty])return null;
+    const m=MONSTERS[ty],p=ALL_PATHS[pathIdx],isRev=2===owner;
+    const e={
+        id:++enemyIdCounter,ty,owner,pathIdx,path:[...p],
+        x:isRev?p[p.length-1].x:p[0].x,y:isRev?p[p.length-1].y:p[0].y,
+        pi:isRev?p.length-1:0,direction:isRev?-1:1,
+        hp:m.hp,mhp:m.hp,atk:m.atk,aspd:m.aspd,spd:m.spd,sd:m.sd||1,
+        alive:!0,mutated:!1,fighting:!1,blocked:!1,
+        elem:WUXING[Math.floor(5*Math.random())],
+        slow:0,slowDur:0,frozen:!1,frozenDur:0,savedSlow:0,
+        burn:0,burnTimer:0,shield:0,maxShield:0
+    };
+    if(ty==="tank"){e.shield=50;e.maxShield=50}
+    else if(ty==="elite"){e.shield=100;e.maxShield=100}
+    else if(ty==="boss"){e.shield=200;e.maxShield=200}
+    const mut=MUTATION[ty];
+    if(mut&&Math.random()<mut.p){
+        e.mutated=!0;
+        for(const key in mut){
+            if(key==="p")continue;
+            if(key==="hp"){e.mhp=Math.floor(e.mhp*mut[key]);e.shield=Math.floor(e.shield*mut[key]);e.maxShield=e.shield}
+            else if(e[key]!==void 0){e[key]=Number.isInteger(e[key])?Math.floor(e[key]*mut[key]):+(e[key]*mut[key]).toFixed(2)}
+        }
+        e.hp=e.mhp;
+    }
+    enemies.push(e);return e;
+}
+
+function cleanupDeadEnemies(){for(let e=enemies.length-1;e>=0;e--)if(!enemies[e].alive)enemies.splice(e,1)}
+
+function updateEnemies(dt){
+    const gs=dt*speed;
+    for(const e of enemies){
+        if(!e.alive)continue;
+        if(e.slowDur>0){e.slowDur-=gs;if(e.slowDur<=0){e.slow=0;e.slowDur=0}}
+        if(e.frozenDur>0){e.frozenDur-=gs;if(e.frozenDur<=0){e.frozen=!1;e.blocked=!1;e.slow=e.savedSlow;e.savedSlow=0}}
+        if(e.burn>0){e.burnTimer-=gs;e.hp-=e.burn*3*gs;if(e.burnTimer<=0){e.burn=0;e.burnTimer=0}if(e.hp<=0){e.alive=!1;continue}}
+        if(e.fighting||e.blocked||e.frozen)continue;
+        const atEnd=(1===e.direction&&e.pi>=e.path.length-1)||(-1===e.direction&&e.pi<=0);
+        if(atEnd){
+            e.alive=!1;
+            if(e.owner===0&&gameData)gameData.shield=Math.max(0,gameData.shield-e.sd);
+            continue;
+        }
+        const nextPi=e.pi+e.direction;if(nextPi<0||nextPi>=e.path.length)continue;
+        const tgt=e.path[nextPi],dx=tgt.x-e.x,dy=tgt.y-e.y,dist=Math.hypot(dx,dy);
+        if(dist<ARRIVE_DIST){e.pi=nextPi;continue}
+        let spd=e.spd*(1-e.slow);const mv=spd*gs;e.x+=dx/dist*mv;e.y+=dy/dist*mv;
+    }
+    cleanupDeadEnemies();
+}
+
+// ==================== 塔系统 ====================
+const TOWER_TYPES=["jin","mu","shui","huo","tu"];
+const TOWER={
+    jin:{n:"金灵塔",d:20,r:120,s:1.1,c:50,h:80,elem:"jin",color:"#f7d44a"},
+    mu:{n:"木灵塔",d:16,r:140,s:1.5,c:50,h:70,elem:"mu",color:"#6ab04c"},
+    shui:{n:"水灵塔",d:13,r:130,s:1.3,c:50,h:90,elem:"shui",color:"#3498db"},
+    huo:{n:"火灵塔",d:25,r:120,s:1,c:50,h:70,elem:"huo",color:"#e74c3c"},
+    tu:{n:"土灵塔",d:18,r:100,s:0.8,c:50,h:110,elem:"tu",color:"#cd853f"}
+};
+let towers=[],towerIdCounter=0;
+const T_R=18,T_BUILD_GAP=2*T_R+4,PATH_HALF_WIDTH=22,MAX_LS=99999,REWARD_RATIO=0.5,MIN_REWARD=10;
+const ARRIVE_DIST=5;
+
+function calcWuxingMultiplier(e,t){return e&&t?KE[e]===t?KEP:KE[t]===e?KEM:1:1}
+function isOnPath(e,t){
+    for(const n of ALL_PATHS){
+        if(n.length===1){if(Math.hypot(e-n[0].x,t-n[0].y)<PATH_HALF_WIDTH)return!0;continue}
+        for(let i=1;i<n.length;i++){
+            const dx=n[i].x-n[i-1].x,dy=n[i].y-n[i-1].y,len=Math.hypot(dx,dy);if(len===0)continue;
+            const dot=((e-n[i-1].x)*dx+(t-n[i-1].y)*dy)/(len*len),cx=n[i-1].x+Math.max(0,Math.min(1,dot))*dx,cy=n[i-1].y+Math.max(0,Math.min(1,dot))*dy;
+            if(Math.hypot(e-cx,t-cy)<PATH_HALF_WIDTH)return!0;
+        }
+    }
+    return!1;
+}
+
+function tryBuildTower(sx,sy,towerType,owner){
+    if(isOnPath(sx,sy))return{success:!1,reason:"路径上无法建造"};
+    for(const t of towers)if(Math.hypot(t.x-sx,t.y-sy)<T_BUILD_GAP)return{success:!1,reason:"此处已有塔"};
+    const config=TOWER[towerType];if(!config)return{success:!1,reason:"未知塔类型"};
+    const wallet=gameData;
+    if(wallet.lingshi<config.c)return{success:!1,reason:"灵石不足"};
+    wallet.lingshi-=config.c;wallet.lingshi=Math.max(0,wallet.lingshi);
+    const t={id:++towerIdCounter,ty:towerType,x:sx,y:sy,lv:1,dmg:config.d,range:config.r,spd:config.s,cd:0,owner:0,elem:config.elem,color:config.color};
+    towers.push(t);return{success:!0,tower:t};
+}
+
+function updateTowers(dt){
+    const gs=dt*speed;
+    const shengMap=new Map;
+    for(const t of towers){
+        if(NO_SHENG.has(t.elem)){shengMap.set(t.id,1);continue}
+        let layers=0;
+        for(const o of towers){
+            if(o.id===t.id||NO_SHENG.has(o.elem))continue;
+            if(SHENG[o.elem]===t.elem&&Math.hypot(t.x-o.x,t.y-o.y)<=SHENG_R)layers++;
+        }
+        shengMap.set(t.id,1+Math.min(layers,MAX_SHENG_LAYERS)*SHENG_PER);
+    }
+    for(const t of towers){
+        if(t.cd>0){t.cd-=gs;continue}
+        let best=null,bestScore=-Infinity;
+        for(const e of enemies){
+            if(!e.alive)continue;
+            const dist=Math.hypot(e.x-t.x,e.y-t.y);if(dist>t.range)continue;
+            const score=1000*(e.direction===1?e.pi:e.path.length-1-e.pi)+(t.range-dist);
+            if(score>bestScore){bestScore=score;best=e}
+        }
+        if(!best)continue;
+        const wx=calcWuxingMultiplier(t.elem,best.elem);
+        const sg=shengMap.get(t.id)||1;
+        let dmg=t.dmg*wx*sg;
+        let hpDmg=dmg;
+        if(best.shield>0){
+            if(t.ty==="jin"){
+                const armorMult=1.5+(t.lv-1)*0.375;
+                best.shield=Math.max(0,best.shield-dmg*armorMult);
+                hpDmg=0;
+            }else{
+                let shieldDmg=dmg;
+                if(best.burn>0)shieldDmg*=(1+best.burn*0.04);
+                if(best.shield>=shieldDmg){best.shield-=shieldDmg;hpDmg=0}
+                else{hpDmg=shieldDmg-best.shield;best.shield=0}
+            }
+        }
+        best.hp-=hpDmg;
+        t.cd=1/t.spd;
+        if(t.ty==="mu"&&Math.random()<0.35){best.slow=0.4;best.slowDur=2}
+        if(t.ty==="shui"&&Math.random()<0.3){best.savedSlow=best.slow;best.slow=0;best.frozen=!0;best.frozenDur=0.8;best.blocked=!0}
+        if(t.ty==="huo"){
+            best.burn=Math.min(5,(best.burn||0)+1);best.burnTimer=2;
+            for(const o of enemies){
+                if(o.id===best.id||!o.alive)continue;
+                if(Math.hypot(o.x-t.x,o.y-t.y)<=55)o.hp-=dmg*0.2;
+            }
+        }
+        if(best.hp<=0){
+            best.alive=!1;
+            const mc=MONSTERS[best.ty];const rw=mc?.reward||Math.floor((mc?.cost||0)*REWARD_RATIO)||MIN_REWARD;
+            gameData.lingshi=Math.min(MAX_LS,gameData.lingshi+rw);
+        }
+    }
+}
+
+// ==================== 波次系统 ====================
+let wave=0,maxWave=15,waveTimer=0,waveActive=!1,isFirstPrep=!0,waveShieldSnapshot=0,spawnQueue=[],spawnInterval=0;
+const WAVE_PREP_SHORT=5,WAVE_PREP_LONG=30,WAVE_PREP_FIRST=30,SPAWN_INTERVAL=0.4;
+const WAVE_CONFIG={"1-2":{count:[3,4],boss:0,elite:0,tank:0,swift:0,normal:1},"3-5":{count:[4,6],boss:0,elite:0,tank:.1,swift:.2,normal:.7},"6-8":{count:[5,7],boss:0,elite:.05,tank:.2,swift:.3,normal:.45},"9-12":{count:[6,8],boss:.03,elite:.12,tank:.25,swift:.3,normal:.3},"13-15":{count:[7,9],boss:.08,elite:.2,tank:.3,swift:.25,normal:.17}};
+const DIFFICULTY_MOD={easy:{hp:.8,spd:.9,countMod:-1},normal:{hp:1,spd:1,countMod:0},hard:{hp:1.3,spd:1.15,countMod:1}};
+function getCurrentChapter(){return currentChapter||0}
+function getDifficultyMod(){return DIFFICULTY_MOD[currentDifficulty]||DIFFICULTY_MOD["normal"]}
+function getInitLingshi(){return 150+15*getCurrentChapter()}
+function getWaveReward(w){const ch=getCurrentChapter();if(w<=5)return 40+3*ch;if(w<=10)return 55+3*ch;if(w<=14)return 70+3*ch;return 90+3*ch}
+function getEarlyReward(w){if(w<=5)return 20+2*w;if(w<=15)return 30+3*w;return 30+3*w}
+function getWaveConfig(w){for(const key in WAVE_CONFIG){const[m,M]=key.split("-").map(Number);if(w>=m&&w<=M)return WAVE_CONFIG[key]}return WAVE_CONFIG["13-15"]}
+function applyDifficultyToMonster(e){const mod=getDifficultyMod();e.mhp=Math.floor(e.mhp*mod.hp);e.hp=e.mhp;e.spd=Math.floor(e.spd*mod.spd);return e}
+function spawnWaveEnemies(){
+    if(wave>=maxWave)return;wave++;waveShieldSnapshot=gameData.shield;
+    const cfg=getWaveConfig(wave),dm=getDifficultyMod();
+    let bc=cfg.count[0]+Math.floor(Math.random()*(cfg.count[1]-cfg.count[0]+1));
+    const tc=Math.max(1,bc+dm.countMod),queue=[];
+    for(let i=0;i<tc;i++){const r=Math.random();let ty="normal";if(r<cfg.boss)ty="boss";else if(r<cfg.boss+cfg.elite)ty="elite";else if(r<cfg.boss+cfg.elite+cfg.tank)ty="tank";else if(r<cfg.boss+cfg.elite+cfg.tank+cfg.swift)ty="swift";queue.push({ty,pathIdx:Math.floor(Math.random()*ALL_PATHS.length),owner:0})}
+    for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[queue[i],queue[j]]=[queue[j],queue[i]]}
+    spawnQueue=queue;spawnInterval=SPAWN_INTERVAL;waveTimer=0;
+}
+function startWavePrep(){waveActive=!1;if(isFirstPrep){waveTimer=WAVE_PREP_FIRST;isFirstPrep=!1}else{waveTimer=gameData.shield>=waveShieldSnapshot?WAVE_PREP_SHORT:WAVE_PREP_LONG}}
+function manualStartWave(){if(waveActive||wave>=maxWave)return!1;if(!isFirstPrep){const r=getEarlyReward(wave+1);gameData.lingshi=Math.min(MAX_LS,gameData.lingshi+r)}spawnWaveEnemies();isFirstPrep=!1;return!0}
+function updateWaveSystem(dt){const gs=dt*speed;if(spawnQueue.length>0){spawnInterval-=gs;while(spawnInterval<=0&&spawnQueue.length>0){const s=spawnQueue.shift(),e=spawnMonster(s.ty,s.pathIdx,s.owner);if(e)applyDifficultyToMonster(e);spawnInterval+=SPAWN_INTERVAL}if(spawnQueue.length===0)spawnInterval=0}if(waveActive&&enemies.length===0&&spawnQueue.length===0){startWavePrep();if(wave>0&&!isFirstPrep)gameData.lingshi=Math.min(MAX_LS,gameData.lingshi+getWaveReward(wave))}if(!waveActive&&wave<maxWave){waveTimer-=gs;if(waveTimer<=0)spawnWaveEnemies()}}
+function resetWaveSystem(){wave=0;waveActive=!1;waveTimer=0;isFirstPrep=!0;spawnQueue=[];spawnInterval=0;waveShieldSnapshot=0;startWavePrep()}
+
+// ==================== UI与存档 ====================
+const canvas=document.getElementById("gameCanvas"),ctx=canvas.getContext("2d"),gameContainer=document.getElementById("gameContainer");
+let gameData={lingshi:300,shield:15,maxShield:15},gameRunning=!1,paused=!1,speed=1,selectedType=null,selectedId=null,currentChapter=0,currentLevel=0,currentDifficulty="normal";
+let ALL_PATHS=[[{x:0,y:165},{x:220,y:165},{x:220,y:110},{x:660,y:110},{x:660,y:165},{x:800,y:165}],[{x:0,y:440},{x:220,y:440},{x:220,y:495},{x:660,y:495},{x:660,y:440},{x:800,y:440}]];
+const CHAPTERS=[];for(let e=0;e<8;e++){const t=[];for(let n=0;n<5;n++)t.push({name:`关卡${n+1}`,waves:10+3*e+2*n});CHAPTERS.push({name:`第${e+1}章`,levels:t})}let chapterUnlocked=[!0,!1,!1,!1,!1,!1,!1,!1];
+function showChapterSelect(){const e=document.getElementById("chapterModal"),t=document.getElementById("chapterGrid");t.innerHTML=CHAPTERS.map((e,t)=>`<button class="btn shop-item" onclick="window.selectChapter(${t})">${e.name}</button>`).join(""),openModal("chapterModal")}
+function initUI(){const e=document.getElementById("towerBtnContainer");TOWER_TYPES.forEach(t=>{const n=TOWER[t],o=document.createElement("button");o.className="btn tower-btn",o.style.background=n.color,o.id="towerBtn_"+t,o.innerHTML=`${n.n}<br><small>${n.c}💎</small>`,o.onclick=()=>{selectedType=t,selectedId=null,document.getElementById("towerInfoPanel").style.display="none",document.querySelectorAll(".tower-btn").forEach(e=>e.classList.remove("selected")),o.classList.add("selected")},e.appendChild(o)});const t=document.getElementById("waveTimerRow");t.style.cursor="pointer",t.title="点击提前开启下一波（有奖励）",t.onclick=()=>{waveActive||wave>=maxWave||manualStartWave()}}
+function drawPaths(){ALL_PATHS.forEach((e,t)=>{ctx.strokeStyle="#1a1a2e",ctx.lineWidth=42,ctx.lineCap="round",ctx.lineJoin="round",ctx.beginPath(),ctx.moveTo(e[0].x,e[0].y);for(let t=1;t<e.length;t++)ctx.lineTo(e[t].x,e[t].y);ctx.stroke(),ctx.strokeStyle=["#5c4033","#7d5a3c","#5c4033"][t%3],ctx.lineWidth=36,ctx.beginPath(),ctx.moveTo(e[0].x,e[0].y);for(let t=1;t<e.length;t++)ctx.lineTo(e[t].x,e[t].y);ctx.stroke(),ctx.strokeStyle="#8b7355",ctx.lineWidth=30,ctx.beginPath(),ctx.moveTo(e[0].x,e[0].y);for(let t=1;t<e.length;t++)ctx.lineTo(e[t].x,e[t].y);ctx.stroke()})}
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle="rgba(255,255,255,0.08)";ctx.lineWidth=0.5;
+    for(let x=0;x<=canvas.width;x+=CELL){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke()}
+    for(let y=0;y<=canvas.height;y+=CELL){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke()}
+    drawPaths();
+    towers.forEach(t=>{ctx.fillStyle=t.color||"#fff",ctx.beginPath(),ctx.arc(t.x,t.y,T_R,0,2*Math.PI),ctx.fill(),ctx.fillStyle="#fff",ctx.font="bold 9px Arial",ctx.textAlign="center",ctx.fillText("Lv"+t.lv,t.x,t.y+3)});
+    enemies.forEach(t=>{const n=MONSTERS[t.ty]?.color||"#fff";ctx.fillStyle=t.mutated?"#b10dc9":n,ctx.beginPath(),ctx.arc(t.x,t.y,t.mutated?E_R+3:E_R,0,2*Math.PI),ctx.fill(),t.mutated&&(ctx.strokeStyle="rgba(177,13,201,0.6)",ctx.lineWidth=3,ctx.beginPath(),ctx.arc(t.x,t.y,E_R+6,0,2*Math.PI),ctx.stroke());const o=20,i=3;ctx.fillStyle="#333",ctx.fillRect(t.x-o/2,t.y-18,o,i),ctx.fillStyle="#e74c3c",ctx.fillRect(t.x-o/2,t.y-18,o*(t.hp/t.mhp),i),t.frozen&&(ctx.fillStyle="rgba(0,200,255,0.6)",ctx.beginPath(),ctx.arc(t.x,t.y,E_R+4,0,2*Math.PI),ctx.fill()),t.burn>0&&(ctx.fillStyle="rgba(255,100,0,0.5)",ctx.beginPath(),ctx.arc(t.x,t.y,E_R+2,0,2*Math.PI),ctx.fill())});
+}
+function updateUI(){document.getElementById("shieldVal").textContent=gameData.shield,document.getElementById("maxShieldVal").textContent=gameData.maxShield,document.getElementById("lingshiVal").textContent=gameData.lingshi,document.getElementById("waveVal").textContent=wave,document.getElementById("totalWavesVal").textContent=maxWave,document.getElementById("speedLabel").textContent=speed+"x",!waveActive&&wave<maxWave?(document.getElementById("waveTimerRow").style.display="block",document.getElementById("waveTimerVal").textContent=Math.ceil(Math.max(0,waveTimer))):document.getElementById("waveTimerRow").style.display="none"}
+function startGame(e,t,n){
+    gameRunning=!0,paused=!1,speed=1,wave=0,towers=[],enemies=[],maxWave=CHAPTERS[t||0].levels[n||0].waves,ALL_PATHS.length=0;
+    const pathCount = t < 2 ? 2 : t < 5 ? 3 : 4;
+    const spacing = 600 / (pathCount + 1);
+    for(let i=0;i<pathCount;i++){const y=spacing*(i+1);ALL_PATHS.push([{x:0,y},{x:220,y},{x:220,y-55},{x:660,y-55},{x:660,y},{x:800,y}])}
+    gameData={lingshi:getInitLingshi(),shield:15,maxShield:15},resetWaveSystem(),currentChapter=t||0,currentLevel=n||0,selectedType=null,selectedId=null,document.getElementById("gameContainer").style.display="flex",document.getElementById("mainMenu").style.display="none",document.getElementById("towerInfoPanel").style.display="none",document.getElementById("soloStatusRow").style.display="flex"
+}
+function update(dt){updateEnemies(dt),cleanupDeadEnemies(),updateTowers(dt),updateWaveSystem(dt),updateUI();if(gameData.shield<=0)gameRunning=!1,document.getElementById("failureStats").textContent=`坚守至${wave}波`,openModal("failureModal");if(wave>=maxWave&&0===enemies.length&&!waveActive&&gameRunning){gameRunning=!1,currentChapter<7&&(chapterUnlocked[currentChapter+1]=!0);try{localStorage.setItem("td_chapters",JSON.stringify(chapterUnlocked))}catch(e){}document.getElementById("victoryStats").textContent=`通关第${currentChapter+1}章！`,openModal("victoryModal")}}
+function loop(e){return gameRunning&&!paused?(loop.lastTs=loop.lastTs||e,update(Math.min(.05,(e-loop.lastTs)/1e3)),loop.lastTs=e,draw(),requestAnimationFrame(loop)):requestAnimationFrame(loop)}loop.lastTs=0;
+
+// 事件
+canvas.addEventListener("click",e=>{if(!gameRunning)return;const t=canvas.getBoundingClientRect(),n=(e.clientX-t.left)*(canvas.width/t.width),o=(e.clientY-t.top)*(canvas.height/t.height);if(selectedType){const e=Math.floor(n/CELL)*CELL+CELL/2,t=Math.floor(o/CELL)*CELL+CELL/2,i=tryBuildTower(e,t,selectedType,0);i.success?selectedType=null:(document.getElementById("gameNotice").style.display="block",document.getElementById("gameNotice").textContent=i.reason,setTimeout(()=>document.getElementById("gameNotice").style.display="none",1200))}else{const e=towers.find(e=>Math.hypot(e.x-n,e.y-o)<T_R+5);e?(selectedId=e.id,document.getElementById("towerInfoPanel").style.display="block",document.getElementById("towerInfoContent").innerHTML=`<b>${TOWER[e.ty].n}</b> Lv.${e.lv}<br>伤害:${e.dmg.toFixed(1)} 射程:${e.range}`):(selectedId=null,document.getElementById("towerInfoPanel").style.display="none")}});
+document.addEventListener("keydown",e=>{if(modalOpenCount>0)return;" "===e.key&&(e.preventDefault(),paused=!paused)});
+
+// 按钮绑定
+const bind=(e,t,n)=>{const o=document.getElementById(e);o&&o.addEventListener(t,n)},bindClick=(e,t)=>{const n=document.getElementById(e);n&&(n.onclick=t)};
+bind("quitBtn","click",()=>{gameRunning=!1,document.getElementById("gameContainer").style.display="none",document.getElementById("mainMenu").style.display="flex"});
+bindClick("pauseBtn",()=>{modalOpenCount>0||(paused=!paused)});
+document.querySelectorAll(".speed-btn").forEach(e=>{e.onclick=()=>{modalOpenCount>0||(speed=parseInt(e.dataset.speed),document.querySelectorAll(".speed-btn").forEach(e=>e.classList.remove("selected")),e.classList.add("selected"))}}),document.querySelector('.speed-btn[data-speed="1"]')?.classList.add("selected");
+bindClick("campaignBtn",()=>{document.getElementById("mainMenu").style.display="none",showChapterSelect()});
+window.selectChapter=function(e){currentChapter=e,closeModal("chapterModal"),document.getElementById("levelChapterTitle").textContent=CHAPTERS[e].name,document.getElementById("levelGrid").innerHTML=CHAPTERS[e].levels.map((e,t)=>`<button class="btn shop-item" onclick="window.selectLevel(${t})">${e.name}<br><small>${e.waves}波</small></button>`).join(""),openModal("levelModal")};
+window.selectLevel=function(e){currentLevel=e,closeModal("levelModal"),document.getElementById("difficultyGrid").innerHTML='<button class="btn shop-item" onclick="window.selectDifficulty(\'easy\')">简单<br><small>敌人血量-20%</small></button><button class="btn shop-item" onclick="window.selectDifficulty(\'normal\')">普通</button><button class="btn shop-item" onclick="window.selectDifficulty(\'hard\')">困难<br><small>敌人血量+30%</small></button>',openModal("difficultyModal")};
+window.selectDifficulty=function(e){currentDifficulty=e,closeModal("difficultyModal"),startGame("campaign",currentChapter,currentLevel)};
+bindClick("backToChapters",()=>{closeModal("levelModal"),openModal("chapterModal")});
+document.querySelectorAll("#chapterModal .modal-close").forEach(e=>e.onclick=()=>{closeModal("chapterModal"),document.getElementById("mainMenu").style.display="flex"});
+document.querySelectorAll("#levelModal .modal-close").forEach(e=>e.onclick=()=>{closeModal("levelModal"),openModal("chapterModal")});
+document.querySelectorAll("#difficultyModal .modal-close").forEach(e=>e.onclick=()=>{closeModal("difficultyModal"),openModal("levelModal")});
+bindClick("settingsMenuBtn",()=>{document.getElementById("settingsContent").innerHTML='<button class="btn" onclick="window.saveGame()">💾 保存存档</button><button class="btn" onclick="window.clearData()" style="background:#e74c3c;">🗑️ 清除存档</button>',openModal("settingsModal")});
+window.saveGame=function(){try{const e={wave,maxWave,waveActive,waveTimer,isFirstPrep,lingshi:gameData.lingshi,shield:gameData.shield,maxShield:gameData.maxShield,currentChapter,currentLevel,currentDifficulty,towers:towers.slice().map(e=>({id:e.id,ty:e.ty,x:e.x,y:e.y,lv:e.lv,dmg:e.dmg,range:e.range,spd:e.spd,cd:e.cd,owner:e.owner,elem:e.elem})),enemies:enemies.slice().map(e=>({id:e.id,ty:e.ty,owner:e.owner,pathIdx:e.pathIdx,x:e.x,y:e.y,pi:e.pi,direction:e.direction,hp:e.hp,mhp:e.mhp,atk:e.atk,aspd:e.aspd,spd:e.spd,sd:e.sd,alive:e.alive,mutated:e.mutated,elem:e.elem,slow:e.slow||0,slowDur:e.slowDur||0,frozen:e.frozen||!1,frozenDur:e.frozenDur||0,savedSlow:e.savedSlow||0,burn:e.burn||0,burnTimer:e.burnTimer||0,shield:e.shield||0,maxShield:e.maxShield||0})),selectedType,selectedId,paused,speed};localStorage.setItem("td_save",JSON.stringify(e)),localStorage.setItem("td_chapters",JSON.stringify(chapterUnlocked)),alert("存档成功！"),document.getElementById("continueBtn").disabled=!1}catch(e){alert("存档失败")}};
+window.clearData=function(){confirm("确定清除所有数据？")&&(localStorage.removeItem("td_save"),localStorage.removeItem("td_chapters"),alert("已清除"),location.reload())};
+bindClick("victoryNextBtn",()=>{closeModal("victoryModal"),currentChapter<7?(currentChapter++,startGame("campaign",currentChapter,0)):document.getElementById("mainMenu").style.display="flex"});
+bindClick("victoryRestartBtn",()=>{closeModal("victoryModal"),document.getElementById("mainMenu").style.display="flex"});
+bindClick("failureRetryBtn",()=>{closeModal("failureModal"),startGame("campaign",currentChapter,currentLevel)});
+bindClick("failureRestartBtn",()=>{closeModal("failureModal"),document.getElementById("mainMenu").style.display="flex"});
+document.querySelectorAll(".modal-close").forEach(e=>{e.closest("#chapterModal")||e.closest("#levelModal")||e.closest("#difficultyModal")||(e.onclick=()=>closeModal(e.closest(".modal").id))});
+try{const e=localStorage.getItem("td_save");e&&(document.getElementById("continueBtn").disabled=!1);const t=localStorage.getItem("td_chapters");if(t){const e=JSON.parse(t);Array.isArray(e)&&(chapterUnlocked=e)}}catch(e){}
+bindClick("continueBtn",()=>{try{const e=localStorage.getItem("td_save");if(!e)return;const t=JSON.parse(e);if(!t||"object"!=typeof t)return void alert("存档损坏");currentChapter=t.currentChapter||0,currentLevel=t.currentLevel||0,startGame("campaign",currentChapter,currentLevel),wave=t.wave||0,maxWave=t.maxWave||15,waveActive=t.waveActive||!1,waveTimer=t.waveTimer||0,isFirstPrep=void 0!==t.isFirstPrep?t.isFirstPrep:!0,currentDifficulty=t.currentDifficulty||"normal",gameData.lingshi=t.lingshi||300,gameData.shield=t.shield||15,gameData.maxShield=t.maxShield||15,t.towers&&Array.isArray(t.towers)&&(towers=t.towers.map(e=>({id:e.id,ty:e.ty,x:e.x,y:e.y,lv:e.lv,dmg:e.dmg,range:e.range,spd:e.spd,cd:e.cd||0,owner:e.owner||0,elem:e.elem,color:TOWER[e.ty]?.color||"#fff"}))),t.enemies&&Array.isArray(t.enemies)&&(enemies=t.enemies.map(e=>{const t=ALL_PATHS[e.pathIdx]?.length>0?ALL_PATHS[e.pathIdx]:ALL_PATHS[0]||[];return{id:e.id,ty:e.ty,owner:e.owner,pathIdx:e.pathIdx,path:t,x:e.x,y:e.y,pi:e.pi,direction:e.direction,hp:e.hp,mhp:e.mhp,atk:e.atk,aspd:e.aspd,spd:e.spd,sd:e.sd,alive:e.alive,mutated:e.mutated,fighting:!1,blocked:!1,elem:e.elem,slow:e.slow||0,slowDur:e.slowDur||0,frozen:e.frozen||!1,frozenDur:e.frozenDur||0,savedSlow:e.savedSlow||0,burn:e.burn||0,burnTimer:e.burnTimer||0,shield:e.shield||0,maxShield:e.maxShield||0}})),selectedType=t.selectedType||null,selectedId=t.selectedId||null,paused=!0,speed=t.speed||1}catch(e){alert("读档失败")}});
+initUI(),requestAnimationFrame(loop);
+</script>
+</body>
+</html>
