@@ -38,29 +38,40 @@
     <div id="gameNotice"></div>
     <div class="control-panel" id="controlPanel">
         <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button class="btn" id="pauseBtn">⏯️暂停</button>
-            <button class="btn speed-btn" data-speed="1">1x</button>
-            <button class="btn speed-btn" data-speed="2">2x</button>
-            <button class="btn danger" id="quitBtn">🚪退出</button>
+            <button class="btn" id="pauseBtn" onclick="if(modalOpenCount===0)paused=!paused">⏯️暂停</button>
+            <button class="btn speed-btn" data-speed="1" onclick="if(modalOpenCount===0){speed=1;document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected')}">1x</button>
+            <button class="btn speed-btn" data-speed="2" onclick="if(modalOpenCount===0){speed=2;document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('selected'));this.classList.add('selected')}">2x</button>
+            <button class="btn danger" id="quitBtn" onclick="gameRunning=false;document.getElementById('gameContainer').style.display='none';document.getElementById('mainMenu').style.display='flex'">🚪退出</button>
         </div>
         <div class="status-row" id="soloStatusRow">
             <span>🛡️ <span id="shieldVal">15</span>/<span id="maxShieldVal">15</span></span><span>💎 <span id="lingshiVal">300</span></span>
             <span>🌊 <span id="waveVal">0</span>/<span id="totalWavesVal">15</span></span><span>⚡ <span id="speedLabel">1x</span></span>
         </div>
-        <div id="waveTimerRow" style="display:none;background:var(--panel);padding:6px 10px;border-radius:6px;text-align:center;">⏳ 下一波: <span id="waveTimerVal">30</span>秒</div>
+        <div id="waveTimerRow" style="display:none;background:var(--panel);padding:6px 10px;border-radius:6px;text-align:center;cursor:pointer" title="点击提前开启下一波（有奖励）" onclick="if(!waveActive&&wave<maxWave)manualStartWave()">⏳ 下一波: <span id="waveTimerVal">30</span>秒</div>
         <div id="towerInfoPanel" style="background:var(--panel);padding:8px;border-radius:6px;display:none;font-size:0.8rem;"><div id="towerInfoContent"></div></div>
         <div id="towerBtnContainer" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;"></div>
     </div>
 </div>
 
-<div class="modal" id="mainMenu" style="display:flex;"><div class="modal-content" style="max-width:550px;"><h2>🏯 修真塔防 · 双脉守护</h2><p style="color:#aaa;margin-bottom:12px;">五行主题策略塔防</p><div class="grid-2"><button class="btn menu-btn" id="campaignBtn">⚔️ 闯关模式</button><button class="btn menu-btn" id="settingsMenuBtn">⚙️ 设置</button></div><button class="btn menu-btn" id="continueBtn" disabled style="width:100%;margin-top:8px;">💾 继续游戏</button><p style="font-size:0.65rem;color:#666;margin-top:8px;">空格暂停 | 点击地图建塔 | 点击倒计时提前开波</p></div></div>
+<div class="modal" id="mainMenu" style="display:flex;">
+    <div class="modal-content" style="max-width:550px;">
+        <h2>🏯 修真塔防 · 双脉守护</h2>
+        <p style="color:#aaa;margin-bottom:12px;">五行主题策略塔防</p>
+        <div class="grid-2">
+            <button class="btn menu-btn" onclick="document.getElementById('mainMenu').style.display='none';showChapterSelect()">⚔️ 闯关模式</button>
+            <button class="btn menu-btn" onclick="document.getElementById('settingsContent').innerHTML='<button class=btn onclick=window.saveGame()>💾 保存存档</button><button class=btn onclick=window.clearData() style=background:#e74c3c;margin-top:8px>🗑️ 清除存档</button>';openModal('settingsModal')">⚙️ 设置</button>
+        </div>
+        <button class="btn menu-btn" id="continueBtn" disabled style="width:100%;margin-top:8px;" onclick="window.loadContinue()">💾 继续游戏</button>
+        <p style="font-size:0.65rem;color:#666;margin-top:8px;">空格暂停 | 点击地图建塔 | 点击倒计时提前开波</p>
+    </div>
+</div>
 
 <div class="modal" id="chapterModal"><div class="modal-content" style="max-width:600px;"><h2>📖 选择章节</h2><div class="grid-2" id="chapterGrid"></div><button class="btn modal-close" style="width:100%;margin-top:8px;background:#666;">返回</button></div></div>
 <div class="modal" id="levelModal"><div class="modal-content" style="max-width:600px;"><h2 id="levelChapterTitle">🗺️ 选择关卡</h2><div class="grid-3" id="levelGrid"></div><button class="btn" id="backToChapters" style="width:100%;margin-top:8px;background:#666;">返回章节</button></div></div>
 <div class="modal" id="difficultyModal"><div class="modal-content"><h2>⚔️ 选择难度</h2><div id="difficultyGrid"></div><button class="btn modal-close" style="width:100%;margin-top:8px;background:#666;">返回</button></div></div>
 <div class="modal" id="settingsModal"><div class="modal-content"><h2>⚙️ 设置</h2><div id="settingsContent"></div><button class="btn modal-close" style="background:#666;margin-top:8px;">关闭</button></div></div>
-<div class="modal" id="victoryModal"><div class="modal-content"><h2>🎉 恭喜通关！</h2><p id="victoryStats"></p><button class="btn" id="victoryNextBtn">下一章</button><button class="btn" id="victoryRestartBtn">返回主菜单</button></div></div>
-<div class="modal" id="failureModal"><div class="modal-content"><h2>💀 宗门失守</h2><p id="failureStats"></p><button class="btn" id="failureRetryBtn">重试</button><button class="btn" id="failureRestartBtn">返回主菜单</button></div></div>
+<div class="modal" id="victoryModal"><div class="modal-content"><h2>🎉 恭喜通关！</h2><p id="victoryStats"></p><button class="btn" onclick="closeModal('victoryModal');currentChapter<7?(currentChapter++,startGame('campaign',currentChapter,0)):document.getElementById('mainMenu').style.display='flex'">下一章</button><button class="btn" onclick="closeModal('victoryModal');document.getElementById('mainMenu').style.display='flex'" style="margin-top:8px">返回主菜单</button></div></div>
+<div class="modal" id="failureModal"><div class="modal-content"><h2>💀 宗门失守</h2><p id="failureStats"></p><button class="btn" onclick="closeModal('failureModal');startGame('campaign',currentChapter,currentLevel)">重试</button><button class="btn" onclick="closeModal('failureModal');document.getElementById('mainMenu').style.display='flex'" style="margin-top:8px">返回主菜单</button></div></div>
 
 <script>
 // ==================== 公共状态 ====================
@@ -254,7 +265,7 @@ let gameData={lingshi:300,shield:15,maxShield:15},gameRunning=!1,paused=!1,speed
 let ALL_PATHS=[[{x:0,y:165},{x:220,y:165},{x:220,y:110},{x:660,y:110},{x:660,y:165},{x:800,y:165}],[{x:0,y:440},{x:220,y:440},{x:220,y:495},{x:660,y:495},{x:660,y:440},{x:800,y:440}]];
 const CHAPTERS=[];for(let e=0;e<8;e++){const t=[];for(let n=0;n<5;n++)t.push({name:`关卡${n+1}`,waves:10+3*e+2*n});CHAPTERS.push({name:`第${e+1}章`,levels:t})}let chapterUnlocked=[!0,!1,!1,!1,!1,!1,!1,!1];
 function showChapterSelect(){const e=document.getElementById("chapterModal"),t=document.getElementById("chapterGrid");t.innerHTML=CHAPTERS.map((e,t)=>`<button class="btn shop-item" onclick="window.selectChapter(${t})">${e.name}</button>`).join(""),openModal("chapterModal")}
-function initUI(){const e=document.getElementById("towerBtnContainer");TOWER_TYPES.forEach(t=>{const n=TOWER[t],o=document.createElement("button");o.className="btn tower-btn",o.style.background=n.color,o.id="towerBtn_"+t,o.innerHTML=`${n.n}<br><small>${n.c}💎</small>`,o.onclick=()=>{selectedType=t,selectedId=null,document.getElementById("towerInfoPanel").style.display="none",document.querySelectorAll(".tower-btn").forEach(e=>e.classList.remove("selected")),o.classList.add("selected")},e.appendChild(o)});const t=document.getElementById("waveTimerRow");t.style.cursor="pointer",t.title="点击提前开启下一波（有奖励）",t.onclick=()=>{waveActive||wave>=maxWave||manualStartWave()}}
+function initUI(){const e=document.getElementById("towerBtnContainer");TOWER_TYPES.forEach(t=>{const n=TOWER[t],o=document.createElement("button");o.className="btn tower-btn",o.style.background=n.color,o.id="towerBtn_"+t,o.innerHTML=`${n.n}<br><small>${n.c}💎</small>`,o.onclick=()=>{selectedType=t,selectedId=null,document.getElementById("towerInfoPanel").style.display="none",document.querySelectorAll(".tower-btn").forEach(e=>e.classList.remove("selected")),o.classList.add("selected")},e.appendChild(o)})}
 function drawPaths(){ALL_PATHS.forEach((e,t)=>{ctx.strokeStyle="#1a1a2e",ctx.lineWidth=42,ctx.lineCap="round",ctx.lineJoin="round",ctx.beginPath(),ctx.moveTo(e[0].x,e[0].y);for(let t=1;t<e.length;t++)ctx.lineTo(e[t].x,e[t].y);ctx.stroke(),ctx.strokeStyle=["#5c4033","#7d5a3c","#5c4033"][t%3],ctx.lineWidth=36,ctx.beginPath(),ctx.moveTo(e[0].x,e[0].y);for(let t=1;t<e.length;t++)ctx.lineTo(e[t].x,e[t].y);ctx.stroke(),ctx.strokeStyle="#8b7355",ctx.lineWidth=30,ctx.beginPath(),ctx.moveTo(e[0].x,e[0].y);for(let t=1;t<e.length;t++)ctx.lineTo(e[t].x,e[t].y);ctx.stroke()})}
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -280,29 +291,24 @@ function loop(e){return gameRunning&&!paused?(loop.lastTs=loop.lastTs||e,update(
 canvas.addEventListener("click",e=>{if(!gameRunning)return;const t=canvas.getBoundingClientRect(),n=(e.clientX-t.left)*(canvas.width/t.width),o=(e.clientY-t.top)*(canvas.height/t.height);if(selectedType){const e=Math.floor(n/CELL)*CELL+CELL/2,t=Math.floor(o/CELL)*CELL+CELL/2,i=tryBuildTower(e,t,selectedType,0);i.success?selectedType=null:(document.getElementById("gameNotice").style.display="block",document.getElementById("gameNotice").textContent=i.reason,setTimeout(()=>document.getElementById("gameNotice").style.display="none",1200))}else{const e=towers.find(e=>Math.hypot(e.x-n,e.y-o)<T_R+5);e?(selectedId=e.id,document.getElementById("towerInfoPanel").style.display="block",document.getElementById("towerInfoContent").innerHTML=`<b>${TOWER[e.ty].n}</b> Lv.${e.lv}<br>伤害:${e.dmg.toFixed(1)} 射程:${e.range}`):(selectedId=null,document.getElementById("towerInfoPanel").style.display="none")}});
 document.addEventListener("keydown",e=>{if(modalOpenCount>0)return;" "===e.key&&(e.preventDefault(),paused=!paused)});
 
-// 按钮绑定
-const bind=(e,t,n)=>{const o=document.getElementById(e);o&&o.addEventListener(t,n)},bindClick=(e,t)=>{const n=document.getElementById(e);n&&(n.onclick=t)};
-bind("quitBtn","click",()=>{gameRunning=!1,document.getElementById("gameContainer").style.display="none",document.getElementById("mainMenu").style.display="flex"});
-bindClick("pauseBtn",()=>{modalOpenCount>0||(paused=!paused)});
-document.querySelectorAll(".speed-btn").forEach(e=>{e.onclick=()=>{modalOpenCount>0||(speed=parseInt(e.dataset.speed),document.querySelectorAll(".speed-btn").forEach(e=>e.classList.remove("selected")),e.classList.add("selected"))}}),document.querySelector('.speed-btn[data-speed="1"]')?.classList.add("selected");
-bindClick("campaignBtn",()=>{document.getElementById("mainMenu").style.display="none",showChapterSelect()});
+// 章节选择与存档
 window.selectChapter=function(e){currentChapter=e,closeModal("chapterModal"),document.getElementById("levelChapterTitle").textContent=CHAPTERS[e].name,document.getElementById("levelGrid").innerHTML=CHAPTERS[e].levels.map((e,t)=>`<button class="btn shop-item" onclick="window.selectLevel(${t})">${e.name}<br><small>${e.waves}波</small></button>`).join(""),openModal("levelModal")};
 window.selectLevel=function(e){currentLevel=e,closeModal("levelModal"),document.getElementById("difficultyGrid").innerHTML='<button class="btn shop-item" onclick="window.selectDifficulty(\'easy\')">简单<br><small>敌人血量-20%</small></button><button class="btn shop-item" onclick="window.selectDifficulty(\'normal\')">普通</button><button class="btn shop-item" onclick="window.selectDifficulty(\'hard\')">困难<br><small>敌人血量+30%</small></button>',openModal("difficultyModal")};
 window.selectDifficulty=function(e){currentDifficulty=e,closeModal("difficultyModal"),startGame("campaign",currentChapter,currentLevel)};
-bindClick("backToChapters",()=>{closeModal("levelModal"),openModal("chapterModal")});
+window.saveGame=function(){try{const e={wave,maxWave,waveActive,waveTimer,isFirstPrep,lingshi:gameData.lingshi,shield:gameData.shield,maxShield:gameData.maxShield,currentChapter,currentLevel,currentDifficulty,towers:towers.slice().map(e=>({id:e.id,ty:e.ty,x:e.x,y:e.y,lv:e.lv,dmg:e.dmg,range:e.range,spd:e.spd,cd:e.cd,owner:e.owner,elem:e.elem})),enemies:enemies.slice().map(e=>({id:e.id,ty:e.ty,owner:e.owner,pathIdx:e.pathIdx,x:e.x,y:e.y,pi:e.pi,direction:e.direction,hp:e.hp,mhp:e.mhp,atk:e.atk,aspd:e.aspd,spd:e.spd,sd:e.sd,alive:e.alive,mutated:e.mutated,elem:e.elem,slow:e.slow||0,slowDur:e.slowDur||0,frozen:e.frozen||!1,frozenDur:e.frozenDur||0,savedSlow:e.savedSlow||0,burn:e.burn||0,burnTimer:e.burnTimer||0,shield:e.shield||0,maxShield:e.maxShield||0})),selectedType,selectedId,paused,speed};localStorage.setItem("td_save",JSON.stringify(e)),localStorage.setItem("td_chapters",JSON.stringify(chapterUnlocked)),alert("存档成功！"),document.getElementById("continueBtn").disabled=!1}catch(e){alert("存档失败")}};
+window.clearData=function(){confirm("确定清除所有数据？")&&(localStorage.removeItem("td_save"),localStorage.removeItem("td_chapters"),alert("已清除"),location.reload())};
+window.loadContinue=function(){try{const e=localStorage.getItem("td_save");if(!e)return;const t=JSON.parse(e);if(!t||"object"!=typeof t)return void alert("存档损坏");currentChapter=t.currentChapter||0,currentLevel=t.currentLevel||0,startGame("campaign",currentChapter,currentLevel),wave=t.wave||0,maxWave=t.maxWave||15,waveActive=t.waveActive||!1,waveTimer=t.waveTimer||0,isFirstPrep=void 0!==t.isFirstPrep?t.isFirstPrep:!0,currentDifficulty=t.currentDifficulty||"normal",gameData.lingshi=t.lingshi||300,gameData.shield=t.shield||15,gameData.maxShield=t.maxShield||15,t.towers&&Array.isArray(t.towers)&&(towers=t.towers.map(e=>({id:e.id,ty:e.ty,x:e.x,y:e.y,lv:e.lv,dmg:e.dmg,range:e.range,spd:e.spd,cd:e.cd||0,owner:e.owner||0,elem:e.elem,color:TOWER[e.ty]?.color||"#fff"}))),t.enemies&&Array.isArray(t.enemies)&&(enemies=t.enemies.map(e=>{const t=ALL_PATHS[e.pathIdx]?.length>0?ALL_PATHS[e.pathIdx]:ALL_PATHS[0]||[];return{id:e.id,ty:e.ty,owner:e.owner,pathIdx:e.pathIdx,path:t,x:e.x,y:e.y,pi:e.pi,direction:e.direction,hp:e.hp,mhp:e.mhp,atk:e.atk,aspd:e.aspd,spd:e.spd,sd:e.sd,alive:e.alive,mutated:e.mutated,fighting:!1,blocked:!1,elem:e.elem,slow:e.slow||0,slowDur:e.slowDur||0,frozen:e.frozen||!1,frozenDur:e.frozenDur||0,savedSlow:e.savedSlow||0,burn:e.burn||0,burnTimer:e.burnTimer||0,shield:e.shield||0,maxShield:e.maxShield||0}})),selectedType=t.selectedType||null,selectedId=t.selectedId||null,paused=!0,speed=t.speed||1}catch(e){alert("读档失败")}};
+
+// 弹窗返回按钮
+document.getElementById("backToChapters").onclick=()=>{closeModal("levelModal"),openModal("chapterModal")};
 document.querySelectorAll("#chapterModal .modal-close").forEach(e=>e.onclick=()=>{closeModal("chapterModal"),document.getElementById("mainMenu").style.display="flex"});
 document.querySelectorAll("#levelModal .modal-close").forEach(e=>e.onclick=()=>{closeModal("levelModal"),openModal("chapterModal")});
 document.querySelectorAll("#difficultyModal .modal-close").forEach(e=>e.onclick=()=>{closeModal("difficultyModal"),openModal("levelModal")});
-bindClick("settingsMenuBtn",()=>{document.getElementById("settingsContent").innerHTML='<button class="btn" onclick="window.saveGame()">💾 保存存档</button><button class="btn" onclick="window.clearData()" style="background:#e74c3c;">🗑️ 清除存档</button>',openModal("settingsModal")});
-window.saveGame=function(){try{const e={wave,maxWave,waveActive,waveTimer,isFirstPrep,lingshi:gameData.lingshi,shield:gameData.shield,maxShield:gameData.maxShield,currentChapter,currentLevel,currentDifficulty,towers:towers.slice().map(e=>({id:e.id,ty:e.ty,x:e.x,y:e.y,lv:e.lv,dmg:e.dmg,range:e.range,spd:e.spd,cd:e.cd,owner:e.owner,elem:e.elem})),enemies:enemies.slice().map(e=>({id:e.id,ty:e.ty,owner:e.owner,pathIdx:e.pathIdx,x:e.x,y:e.y,pi:e.pi,direction:e.direction,hp:e.hp,mhp:e.mhp,atk:e.atk,aspd:e.aspd,spd:e.spd,sd:e.sd,alive:e.alive,mutated:e.mutated,elem:e.elem,slow:e.slow||0,slowDur:e.slowDur||0,frozen:e.frozen||!1,frozenDur:e.frozenDur||0,savedSlow:e.savedSlow||0,burn:e.burn||0,burnTimer:e.burnTimer||0,shield:e.shield||0,maxShield:e.maxShield||0})),selectedType,selectedId,paused,speed};localStorage.setItem("td_save",JSON.stringify(e)),localStorage.setItem("td_chapters",JSON.stringify(chapterUnlocked)),alert("存档成功！"),document.getElementById("continueBtn").disabled=!1}catch(e){alert("存档失败")}};
-window.clearData=function(){confirm("确定清除所有数据？")&&(localStorage.removeItem("td_save"),localStorage.removeItem("td_chapters"),alert("已清除"),location.reload())};
-bindClick("victoryNextBtn",()=>{closeModal("victoryModal"),currentChapter<7?(currentChapter++,startGame("campaign",currentChapter,0)):document.getElementById("mainMenu").style.display="flex"});
-bindClick("victoryRestartBtn",()=>{closeModal("victoryModal"),document.getElementById("mainMenu").style.display="flex"});
-bindClick("failureRetryBtn",()=>{closeModal("failureModal"),startGame("campaign",currentChapter,currentLevel)});
-bindClick("failureRestartBtn",()=>{closeModal("failureModal"),document.getElementById("mainMenu").style.display="flex"});
-document.querySelectorAll(".modal-close").forEach(e=>{e.closest("#chapterModal")||e.closest("#levelModal")||e.closest("#difficultyModal")||(e.onclick=()=>closeModal(e.closest(".modal").id))});
+document.querySelectorAll("#settingsModal .modal-close").forEach(e=>e.onclick=()=>closeModal("settingsModal"));
+
+// 存档检测
 try{const e=localStorage.getItem("td_save");e&&(document.getElementById("continueBtn").disabled=!1);const t=localStorage.getItem("td_chapters");if(t){const e=JSON.parse(t);Array.isArray(e)&&(chapterUnlocked=e)}}catch(e){}
-bindClick("continueBtn",()=>{try{const e=localStorage.getItem("td_save");if(!e)return;const t=JSON.parse(e);if(!t||"object"!=typeof t)return void alert("存档损坏");currentChapter=t.currentChapter||0,currentLevel=t.currentLevel||0,startGame("campaign",currentChapter,currentLevel),wave=t.wave||0,maxWave=t.maxWave||15,waveActive=t.waveActive||!1,waveTimer=t.waveTimer||0,isFirstPrep=void 0!==t.isFirstPrep?t.isFirstPrep:!0,currentDifficulty=t.currentDifficulty||"normal",gameData.lingshi=t.lingshi||300,gameData.shield=t.shield||15,gameData.maxShield=t.maxShield||15,t.towers&&Array.isArray(t.towers)&&(towers=t.towers.map(e=>({id:e.id,ty:e.ty,x:e.x,y:e.y,lv:e.lv,dmg:e.dmg,range:e.range,spd:e.spd,cd:e.cd||0,owner:e.owner||0,elem:e.elem,color:TOWER[e.ty]?.color||"#fff"}))),t.enemies&&Array.isArray(t.enemies)&&(enemies=t.enemies.map(e=>{const t=ALL_PATHS[e.pathIdx]?.length>0?ALL_PATHS[e.pathIdx]:ALL_PATHS[0]||[];return{id:e.id,ty:e.ty,owner:e.owner,pathIdx:e.pathIdx,path:t,x:e.x,y:e.y,pi:e.pi,direction:e.direction,hp:e.hp,mhp:e.mhp,atk:e.atk,aspd:e.aspd,spd:e.spd,sd:e.sd,alive:e.alive,mutated:e.mutated,fighting:!1,blocked:!1,elem:e.elem,slow:e.slow||0,slowDur:e.slowDur||0,frozen:e.frozen||!1,frozenDur:e.frozenDur||0,savedSlow:e.savedSlow||0,burn:e.burn||0,burnTimer:e.burnTimer||0,shield:e.shield||0,maxShield:e.maxShield||0}})),selectedType=t.selectedType||null,selectedId=t.selectedId||null,paused=!0,speed=t.speed||1}catch(e){alert("读档失败")}});
+
 initUI(),requestAnimationFrame(loop);
 </script>
 </body>
